@@ -53,7 +53,7 @@ st.markdown("Predict pile ultimate load capacity and visualize the estimated loa
 
 st.header("🔧 Enter Pile Parameters")
 
-pile_length = st.slider("Pile Length (m)", 5.0, 40.0, 20.0)
+pile_length = st.slider("Pile Length (m)", 5.0, 100.0, 20.0)
 pile_diameter = st.slider("Pile Diameter (m)", 0.3, 2.0, 0.6)
 spt_n_value = st.slider("SPT-N Value", 5, 100, 30)
 friction_angle = st.slider("Soil Friction Angle (°)", 20.0, 45.0, 35.0)
