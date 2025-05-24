@@ -1,73 +1,61 @@
-import streamlit as st
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.preprocessing import LabelEncoder
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, confusion_matrix
 import matplotlib.pyplot as plt
 
-# ----------------------
-# Generate Synthetic Training Data
-# ----------------------
+# Step 1: Create synthetic PIT feature dataset
+np.random.seed(42)
+n_samples = 500
 
-@st.cache_data
-def generate_and_train_model():
-    np.random.seed(42)
-    n_samples = 200
-    data = {
-        'pile_length': np.random.uniform(10, 30, n_samples),
-        'pile_diameter': np.random.uniform(0.3, 1.2, n_samples),
-        'spt_n_value': np.random.randint(10, 50, n_samples),
-        'friction_angle': np.random.uniform(25, 40, n_samples),
-        'pile_type': np.random.choice(['Driven', 'Bored'], n_samples)
-    }
+data = {
+    'max_velocity': np.random.normal(4, 1, n_samples),
+    'signal_duration': np.random.normal(20, 5, n_samples),
+    'reflected_peaks': np.random.randint(0, 5, n_samples),
+    'energy': np.random.normal(80, 20, n_samples),
+    'defect_depth': np.random.uniform(0, 10, n_samples)
+}
 
-    df = pd.DataFrame(data)
-    df['load_capacity'] = (
-        100 * df['pile_length'] * df['pile_diameter'] +
-        50 * df['spt_n_value'] +
-        30 * df['friction_angle'] +
-        np.where(df['pile_type'] == 'Driven', 500, -200) +
-        np.random.normal(0, 1000, n_samples)
-    )
+# Simulated labels: 0 = Good, 1 = Possible Defect, 2 = Defective
+labels = []
 
-    le = LabelEncoder()
-    df['pile_type_encoded'] = le.fit_transform(df['pile_type'])
+for i in range(n_samples):
+    if data['reflected_peaks'][i] >= 3 or data['defect_depth'][i] > 6:
+        labels.append(2)  # Defective
+    elif data['reflected_peaks'][i] == 2:
+        labels.append(1)  # Possible defect
+    else:
+        labels.append(0)  # Good
 
-    X = df[['pile_length', 'pile_diameter', 'spt_n_value', 'friction_angle', 'pile_type_encoded']]
-    y = df['load_capacity']
+df = pd.DataFrame(data)
+df['condition'] = labels
 
-    model = RandomForestRegressor(n_estimators=100, random_state=42)
-    model.fit(X, y)
+# Step 2: Train-test split
+X = df.drop(columns='condition')
+y = df['condition']
 
-    return model, le
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# Load model
-model, label_encoder = generate_and_train_model()
+# Step 3: Train model
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
 
-# ----------------------
-# Streamlit UI
-# ----------------------
+# Step 4: Evaluate
+y_pred = model.predict(X_test)
 
-st.title("AI-Powered Pile Load Predictor 🏗️")
-st.markdown("Predict pile ultimate load capacity and visualize the estimated load-settlement behavior.")
+print("Confusion Matrix:")
+print(confusion_matrix(y_test, y_pred))
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred, target_names=["Good", "Possible Defect", "Defective"]))
 
-st.header("🔧 Enter Pile Parameters")
-
-pile_length = st.slider("Pile Length (m)", 5.0, 100.0, 20.0)
-pile_diameter = st.slider("Pile Diameter (m)", 0.3, 2.0, 0.6)
-spt_n_value = st.slider("SPT-N Value", 5, 100, 30)
-friction_angle = st.slider("Soil Friction Angle (°)", 20.0, 45.0, 35.0)
-pile_type = st.selectbox("Pile Type", ['Driven', 'Bored'])
-
-# Predict and Plot
-if st.button("Predict and Show Curve"):
-    # Encode and predict
-    pile_type_encoded = label_encoder.transform([pile_type])[0]
-    input_features = np.array([[pile_length, pile_diameter, spt_n_value, friction_angle, pile_type_encoded]])
-    predicted_capacity = model.predict(input_features)[0]
-
-    st.success(f"🧠 Predicted Ultimate Load Capacity: **{predicted_capacity:.2f} kN**")
-
-    # Simulate a load-settlement curve
-    loads = np.linspace(0, predicted_capacity * 1.2, 50)
-    settlement = 0.05 * (loads / predicted_capacity) + 0.5 * (loads / predicted_capacity) ** 3  # synt**_*_*
+# Step 5: Visualize predictions
+plt.figure(figsize=(6, 4))
+plt.hist(y_pred, bins=[-0.5, 0.5, 1.5, 2.5], edgecolor='black', rwidth=0.8)
+plt.xticks([0, 1, 2], ["Good", "Possible Defect", "Defective"])
+plt.title("Predicted Pile Conditions")
+plt.xlabel("Condition")
+plt.ylabel("Count")
+plt.grid(True)
+plt.tight_layout()
+plt.show()
