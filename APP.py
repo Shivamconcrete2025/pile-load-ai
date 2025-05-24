@@ -1,61 +1,86 @@
+import streamlit as st
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report, confusion_matrix
 import matplotlib.pyplot as plt
 
-# Step 1: Create synthetic PIT feature dataset
-np.random.seed(42)
-n_samples = 500
+# ---------------------
+# Train AI Model (Simulated Data)
+# ---------------------
+@st.cache_data
+def train_model():
+    np.random.seed(42)
+    n_samples = 500
+    data = {
+        'max_velocity': np.random.normal(4, 1, n_samples),
+        'signal_duration': np.random.normal(20, 5, n_samples),
+        'reflected_peaks': np.random.randint(0, 5, n_samples),
+        'energy': np.random.normal(80, 20, n_samples),
+        'defect_depth': np.random.uniform(0, 10, n_samples)
+    }
 
-data = {
-    'max_velocity': np.random.normal(4, 1, n_samples),
-    'signal_duration': np.random.normal(20, 5, n_samples),
-    'reflected_peaks': np.random.randint(0, 5, n_samples),
-    'energy': np.random.normal(80, 20, n_samples),
-    'defect_depth': np.random.uniform(0, 10, n_samples)
-}
+    labels = []
+    for i in range(n_samples):
+        if data['reflected_peaks'][i] >= 3 or data['defect_depth'][i] > 6:
+            labels.append(2)  # Defective
+        elif data['reflected_peaks'][i] == 2:
+            labels.append(1)  # Possible defect
+        else:
+            labels.append(0)  # Good
 
-# Simulated labels: 0 = Good, 1 = Possible Defect, 2 = Defective
-labels = []
+    df = pd.DataFrame(data)
+    df['condition'] = labels
 
-for i in range(n_samples):
-    if data['reflected_peaks'][i] >= 3 or data['defect_depth'][i] > 6:
-        labels.append(2)  # Defective
-    elif data['reflected_peaks'][i] == 2:
-        labels.append(1)  # Possible defect
-    else:
-        labels.append(0)  # Good
+    X = df.drop(columns='condition')
+    y = df['condition']
 
-df = pd.DataFrame(data)
-df['condition'] = labels
+    model = RandomForestClassifier(n_estimators=100, random_state=42)
+    model.fit(X, y)
 
-# Step 2: Train-test split
-X = df.drop(columns='condition')
-y = df['condition']
+    return model
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# Load model
+model = train_model()
 
-# Step 3: Train model
-model = RandomForestClassifier(n_estimators=100, random_state=42)
-model.fit(X_train, y_train)
+# ---------------------
+# Streamlit UI
+# ---------------------
 
-# Step 4: Evaluate
-y_pred = model.predict(X_test)
+st.set_page_config(page_title="Pile Integrity Test Analyzer", layout="centered")
+st.title("🧠 Pile Integrity Test Analyzer")
+st.markdown("Enter PIT summary parameters to predict pile condition.")
 
-print("Confusion Matrix:")
-print(confusion_matrix(y_test, y_pred))
-print("\nClassification Report:")
-print(classification_report(y_test, y_pred, target_names=["Good", "Possible Defect", "Defective"]))
+# Input form
+with st.form("PIT Input Form"):
+    col1, col2 = st.columns(2)
+    with col1:
+        max_velocity = st.number_input("Max Velocity (m/s)", 0.0, 20.0, 4.0)
+        signal_duration = st.number_input("Signal Duration (ms)", 1.0, 100.0, 20.0)
+        reflected_peaks = st.slider("Reflected Peaks", 0, 5, 1)
+    with col2:
+        energy = st.number_input("Energy (kN·ms)", 0.0, 200.0, 80.0)
+        defect_depth = st.slider("Defect Depth (m)", 0.0, 15.0, 2.0)
 
-# Step 5: Visualize predictions
-plt.figure(figsize=(6, 4))
-plt.hist(y_pred, bins=[-0.5, 0.5, 1.5, 2.5], edgecolor='black', rwidth=0.8)
-plt.xticks([0, 1, 2], ["Good", "Possible Defect", "Defective"])
-plt.title("Predicted Pile Conditions")
-plt.xlabel("Condition")
-plt.ylabel("Count")
-plt.grid(True)
-plt.tight_layout()
-plt.show()
+    submitted = st.form_submit_button("Predict Condition")
+
+# Predict
+if submitted:
+    input_data = np.array([[max_velocity, signal_duration, reflected_peaks, energy, defect_depth]])
+    prediction = model.predict(input_data)[0]
+    label_map = {0: "✅ Good", 1: "⚠️ Possible Defect", 2: "❌ Defective"}
+    st.subheader("Prediction Result")
+    st.success(f"Predicted Condition: **{label_map[prediction]}**")
+
+    # Show explanation
+    st.markdown("### 🧾 Input Summary")
+    st.json({
+        "Max Velocity": max_velocity,
+        "Signal Duration": signal_duration,
+        "Reflected Peaks": reflected_peaks,
+        "Energy": energy,
+        "Defect Depth": defect_depth
+    })
+
+# Footer
+st.markdown("---")
+st.caption("Built with ❤️ using Streamlit and AI")
