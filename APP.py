@@ -83,4 +83,4 @@ if submitted:
 
 # Footer
 st.markdown("---")
-st.caption("Built with ❤️ using Streamlit and AI")
+st.caption("Built with using SHIVAMCONCRETE AI and AI")
